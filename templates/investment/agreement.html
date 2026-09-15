@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}Investment Agreement — {{ agreement.reference_no }}{% endblock %}
+{% block content %}
+<div class="no-print flex-between" style="margin-bottom:1rem;">
+  <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline btn-sm">← Back to Dashboard</a>
+  <button class="btn btn-primary btn-sm" onclick="window.print()">🖨️ Print / Save as PDF</button>
+</div>
+
+{% if agreement.status != 'active' %}
+<div class="glass card-pad no-print" style="margin-bottom:1rem;">
+  <div class="flex-between flex-wrap gap-2">
+    <div>
+      <strong>Signatures needed before this agreement takes effect.</strong>
+      <div class="flex gap-1" style="margin-top:.4rem;">
+        <span class="badge {{ 'badge-verified' if agreement.founder_signed_at else 'badge-pending' }}">Founder: {{ "Signed" if agreement.founder_signed_at else "Pending" }}</span>
+        <span class="badge {{ 'badge-verified' if agreement.investor_signed_at else 'badge-pending' }}">Investor: {{ "Signed" if agreement.investor_signed_at else "Pending" }}</span>
+      </div>
+    </div>
+    {% if current_user.id in (req.investor_id, req.startup.founder_id) %}
+    <a href="{{ url_for('investment.sign_agreement', req_id=req.id) }}" class="btn btn-green btn-sm">Sign Now</a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<div class="glass print-page animate-in">
+  <div style="text-align:center;margin-bottom:1.5rem;">
+    <img src="{{ url_for('static', filename='img/logo.png') }}" style="height:50px;">
+    <h1 style="margin:.5rem 0 0;">Investment &amp; Funding Agreement</h1>
+    <p class="text-muted">Reference No: <strong>{{ agreement.reference_no }}</strong> &nbsp;|&nbsp; Date: {{ agreement.created_at.strftime("%Y-%m-%d") }}</p>
+  </div>
+  <hr class="divider">
+
+  <p>This Agreement ("<strong>Agreement</strong>") is entered into on {{ agreement.created_at.strftime("%B %d, %Y") }}, between:</p>
+  <div class="grid grid-2" style="margin:.8rem 0;">
+    <div><strong>The Founder ("Recipient")</strong><br>{{ req.startup.founder.full_name }}<br>
+      on behalf of <strong>{{ req.startup.name }}</strong> ({{ req.startup.industry }}, {{ req.startup.location }})</div>
+    <div><strong>The Investor ("Provider")</strong><br>{{ req.investor.full_name }}</div>
+  </div>
+  <p class="text-muted" style="font-size:.85rem;">facilitated through the VentureBridge platform, collectively "the Parties."</p>
+
+  <h3 style="margin-top:1.5rem;">1. Background</h3>
+  <p class="text-muted" style="font-size:.9rem;">The Investor expressed interest in the Founder's startup with the following statement:
+    <em>"{{ req.message }}"</em>. The Founder accepted this interest and the Parties negotiated the funding terms
+    set out below through VentureBridge's proposal-review process before both signing this Agreement.</p>
+
+  <h3 style="margin-top:1.5rem;">2. Funding Amount &amp; Use of Funds</h3>
+  <p>The Investor agrees to provide, and the Founder agrees to receive, a total of
+    <strong>${{ "%.2f"|format(agreement.funding_amount) }}</strong>, to be used strictly for the purposes itemized below:</p>
+  {% if final_proposal %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Purpose</th><th>Amount</th></tr></thead>
+      <tbody>
+        {% for it in final_proposal.items %}
+        <tr><td>{{ it.reason }}</td><td>${{ "%.2f"|format(it.amount) }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="text-muted" style="font-size:.85rem;margin-top:.5rem;"><strong>Founder's stated justification:</strong> {{ final_proposal.notes }}</p>
+  {% endif %}
+
+  <h3 style="margin-top:1.5rem;">3. Disbursement Schedule (Milestone-Based)</h3>
+  <p class="text-muted" style="font-size:.9rem;">Funds will not be disbursed as a lump sum. Each milestone below is released
+    independently by a VentureBridge administrator upon the milestone being reached, subject to a
+    {{ agreement.platform_fee_percent }}% platform facilitation fee deducted at each release.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>Milestone</th><th>Amount</th><th>Status</th><th>Released</th>
+        {% if current_user.role == 'admin' %}<th class="no-print">Action</th>{% endif %}</tr></thead>
+      <tbody>
+        {% for m in milestones %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ m.title }}{% if m.description %}<br><span class="text-muted" style="font-size:.78rem;">{{ m.description }}</span>{% endif %}</td>
+          <td>${{ "%.2f"|format(m.amount) }}</td>
+          <td>{% if m.status == 'released' %}<span class="badge badge-verified">Released</span>{% else %}<span class="badge badge-pending">Pending</span>{% endif %}</td>
+          <td>{{ m.released_at.strftime("%Y-%m-%d") if m.released_at else "—" }}</td>
+          {% if current_user.role == 'admin' %}
+          <td class="no-print">
+            {% if m.status == 'pending' and agreement.status == 'active' %}
+            <form method="POST" action="{{ url_for('investment.release_milestone', milestone_id=m.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-green btn-sm" type="submit" onclick="return confirm('Release this milestone? A {{ agreement.platform_fee_percent }}% platform fee applies.')">Release Funds</button>
+            </form>
+            {% else %}—{% endif %}
+          </td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="text-muted"><strong>Total Released to Date:</strong> ${{ "%.2f"|format(agreement.total_released()) }} / ${{ "%.2f"|format(agreement.funding_amount) }}</p>
+
+  <h3 style="margin-top:1.5rem;">4. Benefit to the Investor</h3>
+  <p>In consideration for the funding described above, the Founder agrees to the following:</p>
+  <p>{{ agreement.benefit_terms }}</p>
+
+  <h3 style="margin-top:1.5rem;">5. Representations</h3>
+  <p class="text-muted" style="font-size:.9rem;">Each Party represents that: (a) they have identified themselves to VentureBridge
+    and completed the platform's identity/document verification process where applicable; (b) they have the authority to enter
+    into this Agreement; and (c) the information provided in the negotiation of this Agreement, including the use-of-funds
+    breakdown above, is accurate to the best of their knowledge.</p>
+
+  <h3 style="margin-top:1.5rem;">6. Breach, Disputes &amp; Governing Law</h3>
+  <p class="text-muted" style="font-size:.9rem;">If either Party believes the other has failed to meet an obligation under this
+    Agreement — including misuse of disbursed funds, failure to reach an agreed milestone, or failure to honor the benefit
+    terms in Section 4 — the Parties agree to first attempt a good-faith resolution directly. Should that fail, either Party
+    may pursue any remedy available to them under applicable law. This Agreement does not restrict either Party's right to
+    seek legal counsel or pursue legal action. <strong>Governing law and jurisdiction:</strong> ___________________________
+    <em>(to be completed by the Parties, e.g. the courts of the Founder's country of incorporation)</em>.</p>
+
+  <h3 style="margin-top:1.5rem;">7. Platform Role</h3>
+  <p class="text-muted" style="font-size:.9rem;">VentureBridge acted solely as an introduction and document-facilitation platform
+    and as the administrator of the milestone disbursement schedule in Section 3. VentureBridge is not a party to this
+    Agreement, is not a guarantor of either Party's performance, and its {{ agreement.platform_fee_percent }}% facilitation fee
+    is compensation for administering the milestone-release process only.</p>
+
+  <h3 style="margin-top:1.5rem;">8. Entire Agreement</h3>
+  <p class="text-muted" style="font-size:.9rem;">This document, together with the negotiation history retained on the
+    VentureBridge platform (reference {{ agreement.reference_no }}), constitutes the entire understanding between the Parties
+    on this funding arrangement and supersedes all prior discussions on this specific request. Both Parties acknowledge they
+    have read and understood this Agreement, had the opportunity to seek independent legal advice before signing, and sign
+    below as a binding record of their agreement to these terms.</p>
+
+  <hr class="divider">
+  <h3>Signatures</h3>
+  <div class="grid grid-2" style="margin-top:1rem;">
+    <div>
+      {% if agreement.founder_signed_at %}
+        <strong>{{ agreement.founder_signed_name }}</strong><br>
+        <span class="text-muted" style="font-size:.78rem;">Signed electronically {{ agreement.founder_signed_at.strftime("%Y-%m-%d %H:%M UTC") }}</span>
+      {% else %}
+        _____________________<br><span class="text-muted" style="font-size:.78rem;">Not yet signed</span>
+      {% endif %}
+      <br><span class="text-muted">{{ req.startup.founder.full_name }} — Founder, {{ req.startup.name }}</span>
+    </div>
+    <div>
+      {% if agreement.investor_signed_at %}
+        <strong>{{ agreement.investor_signed_name }}</strong><br>
+        <span class="text-muted" style="font-size:.78rem;">Signed electronically {{ agreement.investor_signed_at.strftime("%Y-%m-%d %H:%M UTC") }}</span>
+      {% else %}
+        _____________________<br><span class="text-muted" style="font-size:.78rem;">Not yet signed</span>
+      {% endif %}
+      <br><span class="text-muted">{{ req.investor.full_name }} — Investor</span>
+    </div>
+  </div>
+
+  <p class="text-muted" style="font-size:.78rem;margin-top:1.5rem;">
+    VentureBridge provides this document as a template to record the Parties' own agreed terms and does not provide
+    legal advice. Parties entering into a significant funding arrangement are encouraged to have this Agreement
+    reviewed by independent legal counsel before or after signing, particularly to complete Section 6.
+  </p>
+</div>
+{% endblock %}

@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="animate-in">
+  <h1>Welcome, {{ current_user.full_name }} <span class="badge badge-blue">{{ current_user.role|capitalize }}</span></h1>
+
+  {% set pct = current_user.profile.completion_percent() %}
+  {% if pct < 100 %}
+  <div class="glass card-pad" style="margin-bottom:1.5rem;">
+    <div class="flex-between"><strong>Profile {{ pct }}% complete</strong>
+      <a href="{{ url_for('main.profile') }}" class="btn btn-outline btn-sm">Complete Profile</a></div>
+    <div style="height:8px;border-radius:6px;background:rgba(255,255,255,.2);margin-top:.6rem;overflow:hidden;">
+      <div style="height:100%;width:{{ pct }}%;background:linear-gradient(90deg,var(--blue-500),var(--green-500));"></div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if current_user.role == 'founder' %}
+    <div class="grid grid-4">
+      <div class="glass stat-card hover-lift"><div class="stat-label">Startups</div><div class="stat-value">{{ startup_count }}</div></div>
+      <div class="glass stat-card hover-lift"><div class="stat-label">Active Jobs</div><div class="stat-value">{{ active_jobs }}</div></div>
+      <div class="glass stat-card hover-lift"><div class="stat-label">Applications</div><div class="stat-value">{{ applications_received }}</div></div>
+      <div class="glass stat-card hover-lift"><div class="stat-label">Pending Investments</div><div class="stat-value">{{ pending_requests }}</div></div>
+    </div>
+    <div class="flex gap-2 flex-wrap" style="margin:1.2rem 0;">
+      <a href="{{ url_for('startups.create') }}" class="btn btn-primary">+ List a Startup</a>
+      <a href="{{ url_for('investment.founder_requests') }}" class="btn btn-outline">Investment Requests</a>
+      <a href="{{ url_for('verification.upload') }}" class="btn btn-outline">Verify Identity</a>
+    </div>
+    <div class="grid grid-2">
+      <div class="glass card-pad">
+        <h3>Application Status Breakdown</h3>
+        <canvas id="chart1"></canvas>
+      </div>
+      <div class="glass card-pad">
+        <h3>Your Startups</h3>
+        {% for s in startups %}
+          <div class="flex-between" style="padding:.5rem 0;border-bottom:1px solid var(--glass-border);">
+            <a href="{{ url_for('startups.detail', startup_id=s.id) }}">{{ s.name }}</a>
+            {% if s.document_status == 'approved' %}<span class="badge badge-verified">Verified</span>
+            {% elif s.document_status == 'rejected' %}<span class="badge badge-rejected">Rejected</span>
+            {% else %}<span class="badge badge-pending">Pending</span>{% endif %}
+          </div>
+        {% else %}<p class="text-muted">No startups yet.</p>{% endfor %}
+      </div>
+    </div>
+
+  {% elif current_user.role == 'investor' %}
+    <div class="grid grid-4">
+      <div class="glass stat-card hover-lift"><div class="stat-label">Interests Sent</div><div class="stat-value">{{ sent }}</div></div>
+      <div class="glass stat-card hover-lift"><div class="stat-label">Accepted</div><div class="stat-value">{{ accepted }}</div></div>
+      <div class="glass stat-card hover-lift"><div class="stat-label">Connections</div><div class="stat-value">{{ connections }}</div></div>
+      <div class="glass stat-card hover-lift"><div class="stat-label">&nbsp;</div><div class="stat-value">🤝</div></div>
+    </div>
+    <div class="flex gap-2 flex-wrap" style="margin:1.2rem 0;">
+      <a href="{{ url_for('startups.list_startups') }}" class="btn btn-primary">Browse Startups</a>
+      <a href="{{ url_for('investment.investor_requests') }}" class="btn btn-outline">My Requests</a>
+      <a href="{{ url_for('verification.upload') }}" class="btn btn-outline">Verify Identity</a>
+    </div>
+    <div class="glass card-pad"><h3>Request Status Breakdown</h3><canvas id="chart1"></canvas></div>
+
+  {% elif current_user.role == 'jobseeker' %}
+    <div class="grid grid-4">
+      <div class="glass stat-card hover-lift"><div class="stat-label">Applications Sent</div><div class="stat-value">{{ applications_sent }}</div></div>
+      <div class="glass stat-card hover-lift"><div class="stat-label">Shortlisted</div><div class="stat-value">{{ shortlisted }}</div></div>
+      <div class="glass stat-card hover-lift"><div class="stat-label">&nbsp;</div><div class="stat-value">💼</div></div>
+      <div class="glass stat-card hover-lift"><div class="stat-label">&nbsp;</div><div class="stat-value">🎯</div></div>
+    </div>
+    <div class="flex gap-2 flex-wrap" style="margin:1.2rem 0;">
+      <a href="{{ url_for('jobs.list_jobs') }}" class="btn btn-primary">Browse Jobs</a>
+      <a href="{{ url_for('jobs.my_applications') }}" class="btn btn-outline">My Applications</a>
+      <a href="{{ url_for('verification.upload') }}" class="btn btn-outline">Verify Identity</a>
+    </div>
+    <div class="glass card-pad"><h3>Application Status Breakdown</h3><canvas id="chart1"></canvas></div>
+
+  {% elif current_user.role == 'admin' %}
+    <div class="grid grid-4">
+      <div class="glass stat-card hover-lift"><div class="stat-label">Total Users</div><div class="stat-value">{{ total_users }}</div></div>
+      <div class="glass stat-card hover-lift"><div class="stat-label">Total Startups</div><div class="stat-value">{{ total_startups }}</div></div>
+      <div class="glass stat-card hover-lift"><div class="stat-label">Pending Documents</div><div class="stat-value">{{ pending_docs }}</div></div>
+      <div class="glass stat-card hover-lift"><div class="stat-label">Pending Verifications</div><div class="stat-value">{{ pending_verifications }}</div></div>
+    </div>
+    <div class="flex gap-2 flex-wrap" style="margin:1.2rem 0;">
+      <a href="{{ url_for('admin.document_queue') }}" class="btn btn-primary">Document Review Queue</a>
+      <a href="{{ url_for('admin.verification_queue') }}" class="btn btn-outline">Verification Queue</a>
+      <a href="{{ url_for('admin.users') }}" class="btn btn-outline">Manage Users</a>
+      <a href="{{ url_for('admin.audit_log') }}" class="btn btn-outline">Audit Log</a>
+    </div>
+    <div class="glass card-pad"><h3>Users by Role</h3><canvas id="chart1"></canvas></div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+  const ctx = document.getElementById('chart1');
+  if (ctx) {
+    new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: {{ chart_labels|default([])|tojson }},
+        datasets: [{
+          data: {{ chart_data|default([])|tojson }},
+          backgroundColor: ['#1f8fe0', '#1eb872', '#c9a227', '#7cc4f5', '#8fe3b8', '#0f5c99']
+        }]
+      },
+      options: { plugins: { legend: { position: 'bottom' } } }
+    });
+  }
+</script>
+{% endblock %}

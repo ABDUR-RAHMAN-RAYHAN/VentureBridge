@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Identity Verification{% endblock %}
+{% block content %}
+<div class="animate-in">
+  <h1>Identity Verification</h1>
+  <p class="text-muted">For security, you must capture <strong>3 live photos</strong> right now using your camera —
+     uploading a pre-existing image file is not accepted. This helps prevent impersonation.</p>
+
+  <div class="glass card-pad" style="max-width:640px;">
+    <form method="POST" novalidate id="verifyForm">
+      {{ form.hidden_tag() }}
+      <div class="form-group">{{ form.doc_type.label }} {{ form.doc_type() }}</div>
+
+      <div id="camStartArea">
+        <button type="button" class="btn btn-primary" id="camStartBtn" onclick="vbWebcam.startCamera()">📷 Start Camera</button>
+        <p class="text-muted" id="camStatus" style="margin-top:.5rem;">Camera access is required for live verification.</p>
+      </div>
+
+      <div id="camLiveArea" style="display:none;">
+        <div class="webcam-box" style="max-width:420px;">
+          <video id="camVideo" autoplay playsinline muted></video>
+        </div>
+        <div class="grid grid-3" style="margin-top:1rem;">
+          {% for slot in [1,2,3] %}
+          <div>
+            <div id="placeholder{{ slot }}" class="photo-slot-empty">Photo {{ slot }}</div>
+            <img id="preview{{ slot }}" class="photo-slot" style="display:none;">
+            <div class="flex gap-1" style="margin-top:.4rem;">
+              <button type="button" class="btn btn-outline btn-sm" onclick="vbWebcam.capturePhoto({{ slot }})">Capture</button>
+              <button type="button" class="btn btn-outline btn-sm" onclick="vbWebcam.retake({{ slot }})">Retake</button>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      {{ form.photo_1(id="photo_1") }}
+      {{ form.photo_2(id="photo_2") }}
+      {{ form.photo_3(id="photo_3") }}
+
+      <button class="btn btn-green" style="margin-top:1.2rem;" type="submit" id="verifySubmitBtn" disabled>
+        Submit for Review
+      </button>
+    </form>
+  </div>
+
+  <h2 style="margin-top:2rem;">Submission History</h2>
+  <div class="glass card-pad table-wrap">
+    <table>
+      <thead><tr><th>Type</th><th>Status</th><th>Submitted</th><th>Reason</th></tr></thead>
+      <tbody>
+        {% for v in history %}
+        <tr>
+          <td>{{ v.doc_type }}</td>
+          <td>
+            {% if v.status == 'approved' %}<span class="badge badge-verified">Approved</span>
+            {% elif v.status == 'rejected' %}<span class="badge badge-rejected">Rejected</span>
+            {% else %}<span class="badge badge-pending">Pending</span>{% endif %}
+          </td>
+          <td>{{ v.submitted_at.strftime("%Y-%m-%d") }}</td>
+          <td>{{ v.reason or "—" }}</td>
+        </tr>
+        {% else %}<tr><td colspan="4" class="text-muted">No submissions yet.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/webcam.js') }}"></script>
+{% endblock %}

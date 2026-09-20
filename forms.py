@@ -115,11 +115,6 @@ class SignatureForm(FlaskForm):
     confirm = HiddenField(validators=[DataRequired(message="You must confirm you agree to the terms.")])
 
 
-class MilestoneSentForm(FlaskForm):
-    note = StringField("Reference / Note (e.g. bank transfer ID, transaction number)",
-                        validators=[DataRequired(), Length(max=500)])
-
-
 class MilestoneProofForm(FlaskForm):
     proof_document = FileField("Proof Document (receipt, invoice, photo, etc.)",
                                 validators=[FileRequired(), FileAllowed(DOC_EXT, "PDF/Image only.")])

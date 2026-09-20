@@ -9,7 +9,7 @@ DOC_STATUS = ("pending", "approved", "rejected")
 APP_STATUS = ("submitted", "reviewing", "shortlisted", "rejected", "accepted")
 REQUEST_STATUS = ("pending", "awaiting_investor_review", "awaiting_founder_review",
                    "milestones_setup", "awaiting_signatures", "active", "rejected")
-MILESTONE_STATUS = ("pending", "investor_sent", "admin_holding", "released")
+MILESTONE_STATUS = ("pending", "released")
 JOB_STATUS = ("open", "closed")
 STAGES = ("Idea", "MVP", "Early Stage", "Growth", "Scaling")
 JOB_TYPES = ("Full-time", "Part-time", "Internship", "Remote", "Contract")
@@ -218,16 +218,39 @@ class Agreement(db.Model):
     investor_signed_name = db.Column(db.String(150))
     investor_signed_at = db.Column(db.DateTime)
 
+    # The investor deposits the FULL funding amount once, up front. VentureBridge
+    # then holds it and releases it to the founder milestone by milestone.
+    investor_deposited_at = db.Column(db.DateTime)
+    investor_deposit_note = db.Column(db.String(500))
+    admin_confirmed_deposit_at = db.Column(db.DateTime)
+    admin_confirmed_deposit_by = db.Column(db.Integer, db.ForeignKey("user.id"))
+
     milestones = db.relationship("FundingMilestone", backref="agreement", cascade="all,delete", lazy="dynamic")
 
     def total_released(self):
+        """Gross amount released (before platform fee deduction)."""
         return sum(float(m.amount) for m in self.milestones if m.status == "released")
 
-    def total_held(self):
-        return sum(float(m.amount) for m in self.milestones if m.status == "admin_holding")
+    def total_fee_charged(self):
+        return sum(float(m.platform_fee_amount() or 0) for m in self.milestones if m.status == "released")
 
-    def total_awaiting_confirmation(self):
-        return sum(float(m.amount) for m in self.milestones if m.status == "investor_sent")
+    def total_received_by_founder(self):
+        """Net amount the founder has actually received, after platform fees."""
+        return sum(float(m.net_to_founder()) for m in self.milestones if m.status == "released")
+
+    def total_still_held(self):
+        """Funds deposited and confirmed but not yet released to the founder."""
+        if not self.admin_confirmed_deposit_at:
+            return 0.0
+        return float(self.funding_amount) - self.total_released()
+
+    def deposit_stage(self):
+        """not_deposited -> awaiting_confirmation -> held"""
+        if self.admin_confirmed_deposit_at:
+            return "held"
+        if self.investor_deposited_at:
+            return "awaiting_confirmation"
+        return "not_deposited"
 
     def is_fully_signed(self):
         return bool(self.founder_signed_at and self.investor_signed_at)
@@ -235,11 +258,12 @@ class Agreement(db.Model):
 
 class FundingMilestone(db.Model):
     """
-    Milestone fund-flow lifecycle (each step is a distinct, auditable action):
-      pending        -> investor marks funds as sent to VentureBridge (admin)
-      investor_sent  -> admin confirms the funds were actually received (admin now holds them)
-      admin_holding  -> admin releases the held funds to the founder
-      released       -> (terminal) founder may attach proof of how the funds were used
+    The investor deposits the full amount up front (tracked on Agreement).
+    Each milestone is then released by an admin, in order, once the previous
+    one is complete. The founder receives the milestone amount MINUS the
+    platform fee; the fee is VentureBridge's charge for facilitating.
+
+    Status: pending -> released
     """
     id = db.Column(db.Integer, primary_key=True)
     agreement_id = db.Column(db.Integer, db.ForeignKey("agreement.id"), nullable=False)
@@ -249,22 +273,30 @@ class FundingMilestone(db.Model):
     status = db.Column(db.String(20), default="pending")
     order_index = db.Column(db.Integer, default=0)
 
-    # Step 1: investor says they've sent the money to VentureBridge (admin)
-    investor_sent_at = db.Column(db.DateTime)
-    investor_sent_note = db.Column(db.String(500))  # e.g. bank transfer reference
-
-    # Step 2: admin confirms receipt and now holds the funds in custody
-    admin_confirmed_at = db.Column(db.DateTime)
-    admin_confirmed_by = db.Column(db.Integer, db.ForeignKey("user.id"))
-
-    # Step 3: admin releases the held funds to the founder
     released_at = db.Column(db.DateTime)
     released_by = db.Column(db.Integer, db.ForeignKey("user.id"))
 
-    # Step 4 (optional, after release): founder uploads proof of how funds were used
+    # Founder uploads proof of how the released funds were used.
+    # Visible to the investor and admin.
     proof_document_filename = db.Column(db.String(255))
     proof_description = db.Column(db.String(500))
     proof_uploaded_at = db.Column(db.DateTime)
+
+    def platform_fee_amount(self):
+        return round(float(self.amount) * (self.agreement.platform_fee_percent / 100), 2)
+
+    def net_to_founder(self):
+        """What the founder actually receives after VentureBridge's fee."""
+        return round(float(self.amount) - self.platform_fee_amount(), 2)
+
+    def is_next_in_sequence(self):
+        """
+        True if this is the earliest still-pending milestone — enforcing that
+        milestones are released one by one, in order.
+        """
+        pending = self.agreement.milestones.filter_by(status="pending").order_by(
+            FundingMilestone.order_index).first()
+        return pending is not None and pending.id == self.id
 
 
 class Connection(db.Model):

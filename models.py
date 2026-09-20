@@ -7,8 +7,9 @@ from extensions import db, bcrypt
 ROLES = ("founder", "investor", "jobseeker", "admin")
 DOC_STATUS = ("pending", "approved", "rejected")
 APP_STATUS = ("submitted", "reviewing", "shortlisted", "rejected", "accepted")
-REQUEST_STATUS = ("pending", "accepted", "rejected")
-MILESTONE_STATUS = ("pending", "released")
+REQUEST_STATUS = ("pending", "awaiting_investor_review", "awaiting_founder_review",
+                   "milestones_setup", "awaiting_signatures", "active", "rejected")
+MILESTONE_STATUS = ("pending", "investor_sent", "admin_holding", "released")
 JOB_STATUS = ("open", "closed")
 STAGES = ("Idea", "MVP", "Early Stage", "Growth", "Scaling")
 JOB_TYPES = ("Full-time", "Part-time", "Internship", "Remote", "Contract")
@@ -60,7 +61,10 @@ class Profile(db.Model):
         fields = [self.photo, self.phone, self.bio, self.location,
                   self.education, self.experience, self.industry, self.skills, self.interests]
         filled = sum(1 for f in fields if f)
-        return int((filled / len(fields)) * 100)
+        total = len(fields) + 1  # +1 for identity verification, required to reach 100%
+        if self.user and self.user.is_verified():
+            filled += 1
+        return int((filled / total) * 100)
 
 
 class Startup(db.Model):
@@ -76,7 +80,6 @@ class Startup(db.Model):
     founded_year = db.Column(db.Integer)
     business_model = db.Column(db.String(255))
     team_size = db.Column(db.Integer)
-    required_skills = db.Column(db.String(500))
     is_active = db.Column(db.Boolean, default=True)
     document_status = db.Column(db.String(20), default="pending")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -220,20 +223,48 @@ class Agreement(db.Model):
     def total_released(self):
         return sum(float(m.amount) for m in self.milestones if m.status == "released")
 
+    def total_held(self):
+        return sum(float(m.amount) for m in self.milestones if m.status == "admin_holding")
+
+    def total_awaiting_confirmation(self):
+        return sum(float(m.amount) for m in self.milestones if m.status == "investor_sent")
+
     def is_fully_signed(self):
         return bool(self.founder_signed_at and self.investor_signed_at)
 
 
 class FundingMilestone(db.Model):
+    """
+    Milestone fund-flow lifecycle (each step is a distinct, auditable action):
+      pending        -> investor marks funds as sent to VentureBridge (admin)
+      investor_sent  -> admin confirms the funds were actually received (admin now holds them)
+      admin_holding  -> admin releases the held funds to the founder
+      released       -> (terminal) founder may attach proof of how the funds were used
+    """
     id = db.Column(db.Integer, primary_key=True)
     agreement_id = db.Column(db.Integer, db.ForeignKey("agreement.id"), nullable=False)
     title = db.Column(db.String(150), nullable=False)
     description = db.Column(db.Text)
     amount = db.Column(db.Numeric(14, 2), nullable=False)
     status = db.Column(db.String(20), default="pending")
+    order_index = db.Column(db.Integer, default=0)
+
+    # Step 1: investor says they've sent the money to VentureBridge (admin)
+    investor_sent_at = db.Column(db.DateTime)
+    investor_sent_note = db.Column(db.String(500))  # e.g. bank transfer reference
+
+    # Step 2: admin confirms receipt and now holds the funds in custody
+    admin_confirmed_at = db.Column(db.DateTime)
+    admin_confirmed_by = db.Column(db.Integer, db.ForeignKey("user.id"))
+
+    # Step 3: admin releases the held funds to the founder
     released_at = db.Column(db.DateTime)
     released_by = db.Column(db.Integer, db.ForeignKey("user.id"))
-    order_index = db.Column(db.Integer, default=0)
+
+    # Step 4 (optional, after release): founder uploads proof of how funds were used
+    proof_document_filename = db.Column(db.String(255))
+    proof_description = db.Column(db.String(500))
+    proof_uploaded_at = db.Column(db.DateTime)
 
 
 class Connection(db.Model):
@@ -263,6 +294,7 @@ class IdentityVerification(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     doc_type = db.Column(db.String(30), nullable=False)
+    id_document_filename = db.Column(db.String(255))  # uploaded NID/passport/license photo or scan
     status = db.Column(db.String(20), default="pending")
     reason = db.Column(db.Text)
     submitted_at = db.Column(db.DateTime, default=datetime.utcnow)

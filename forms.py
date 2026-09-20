@@ -62,7 +62,6 @@ class StartupForm(FlaskForm):
     founded_year = IntegerField("Founded Year", validators=[Optional(), NumberRange(min=1900, max=2100)])
     business_model = StringField("Business Model", validators=[Optional(), Length(max=255)])
     team_size = IntegerField("Team Size", validators=[Optional(), NumberRange(min=1)])
-    required_skills = StringField("Required Skills (comma-separated)", validators=[Optional(), Length(max=500)])
     trade_license = FileField("Trade License (required)", validators=[Optional(), FileAllowed(DOC_EXT)])
 
 
@@ -116,12 +115,24 @@ class SignatureForm(FlaskForm):
     confirm = HiddenField(validators=[DataRequired(message="You must confirm you agree to the terms.")])
 
 
+class MilestoneSentForm(FlaskForm):
+    note = StringField("Reference / Note (e.g. bank transfer ID, transaction number)",
+                        validators=[DataRequired(), Length(max=500)])
+
+
+class MilestoneProofForm(FlaskForm):
+    proof_document = FileField("Proof Document (receipt, invoice, photo, etc.)",
+                                validators=[FileRequired(), FileAllowed(DOC_EXT, "PDF/Image only.")])
+    description = StringField("What does this prove?", validators=[DataRequired(), Length(max=500)])
+
+
 class VerificationForm(FlaskForm):
-    doc_type = SelectField("Document Type", choices=[(d, d) for d in
-                            ("National ID", "Passport", "Driving License")], validators=[DataRequired()])
-    photo_1 = HiddenField(validators=[DataRequired(message="Live photo 1 is required.")])
-    photo_2 = HiddenField(validators=[DataRequired(message="Live photo 2 is required.")])
-    photo_3 = HiddenField(validators=[DataRequired(message="Live photo 3 is required.")])
+    doc_type = SelectField("ID Document Type", choices=[(d, d) for d in
+                            ("National ID", "Passport", "Driving License")], validators=[Optional()])
+    id_document = FileField("Upload NID / ID Card Photo", validators=[Optional(), FileAllowed(DOC_EXT, "PDF/Image only.")])
+    photo_1 = HiddenField(validators=[Optional()])
+    photo_2 = HiddenField(validators=[Optional()])
+    photo_3 = HiddenField(validators=[Optional()])
 
 
 class ReviewForm(FlaskForm):

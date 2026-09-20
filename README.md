@@ -145,8 +145,8 @@ Password for every demo account: **`Demo@1234`**
 | Admin      | admin@venturebridge.demo        | Review queues, user/startup/job management |
 | Founder    | aisha@venturebridge.demo        | Identity-verified. Owns GreenTech Solutions (documents verified) + AgriLink Marketplace (pending) |
 | Founder    | farhan@venturebridge.demo       | Identity-verified. Owns MediConnect (documents verified) + SolarGrid Energy (documents verified) |
-| Investor   | david@venturebridge.demo        | Has a fully signed, active agreement with Aisha (GreenTech), and a separate pending interest sent to Farhan (MediConnect) awaiting his first response |
-| Investor   | meera@venturebridge.demo        | Has a request mid-negotiation with Aisha (GreenTech) — she countered the founder's proposal and it's awaiting Aisha's decision |
+| Investor   | david@venturebridge.demo        | Has a fully signed, active agreement with Aisha (GreenTech), and a separate pending interest sent to Farhan (MediConnect) awaiting his first response. His own identity verification is intentionally **pending** — sending a *new* interest requires an admin to approve it first. |
+| Investor   | meera@venturebridge.demo        | Identity-verified. Has a request mid-negotiation with Aisha (GreenTech) — she countered the founder's proposal and it's awaiting Aisha's decision |
 | Job Seeker | sara@venturebridge.demo         | Has one application already submitted |
 
 ## Try the end-to-end story
@@ -166,16 +166,25 @@ Password for every demo account: **`Demo@1234`**
    **Aisha** and **Meera** sign it (in two separate logins) to watch messaging unlock only once
    both signatures are in.
 5. Log in as **David** (investor) → My Requests → his GreenTech agreement is already fully signed
-   and active — open the formal Investment & Funding Agreement document, and as **Admin**, release
-   the next pending milestone.
+   and active — open the Investment & Funding Agreement document. Its 3 milestones are seeded at
+   different stages of the fund-flow pipeline: one **released** (with a proof-of-use document
+   already attached), one **held by VentureBridge** (ready for an admin to release), and one
+   **sent by the investor** (ready for an admin to confirm receipt). Log in as **Admin** to try
+   "Confirm Funds Received" and "Release to Founder" on the latter two.
 6. Log in as **David** or **Aisha** → Messages — they're already connected with sample messages
    (because their agreement was fully signed in the seed data).
-7. Log in as **Farhan** (founder) → Investment Requests → David's pending interest in MediConnect
+7. David's own identity verification is intentionally left **pending** in the seed data — try
+   sending a new investment interest as David to a startup he hasn't requested yet (e.g. SolarGrid
+   Energy) and you'll be redirected to verification first. Log in as **Admin** → Verification Queue
+   to approve David's submission, then the interest can be sent.
+8. Log in as **Farhan** (founder) → Investment Requests → David's pending interest in MediConnect
    is still waiting for Farhan's initial response — click "Accept & Send Proposal" to try the
    financial-distribution proposal form yourself, then optionally use the CSP solver again when
    you reach the milestone step.
-8. As Admin → Audit Log to see every action recorded, including proposal submissions, revisions,
-   and signatures.
+9. Log in as **Aisha** or **David** → Dashboard → **Transaction History**, to see every milestone
+   payment across their agreements and its current fund-flow stage in one ledger.
+10. As Admin → Audit Log to see every action recorded, including proposal submissions, revisions,
+    signatures, and every milestone fund-flow event.
 
 ## Project structure
 
@@ -189,15 +198,82 @@ venturebridge/
   decorators.py       # Role-based access control
   utils.py            # Secure upload handling, audit logging
   seed.py             # Demo data seeding script
-  blueprints/          # auth, main, startups, jobs, investment, verification, messaging, admin
+  blueprints/          # auth, main, startups, jobs, investment, messaging, admin
   algorithms/          # CSP milestone scheduler, KNN startup recommender
-  templates/           # Jinja2 templates (glassy-glossy UI)
+  templates/           # Jinja2 templates (glassy-glossy UI for the app, plain document
+                        #   layout for generated legal documents like the agreement)
   static/
-    css/style.css      # Liquid-glass theme
+    css/style.css      # Liquid-glass theme (app pages)
+    css/document.css   # Plain black-on-white theme (generated documents only)
     js/                # theme toggle, webcam capture, misc UI
     img/logo.png        # VentureBridge logo
     uploads/            # Runtime file uploads (documents, cv, verification, logos)
 ```
+
+## Recent changes (this revision)
+
+**Bug fixes (previous revision):**
+- Identity verification (3 live photos) is now embedded directly on the **Edit Profile** page —
+  there's no separate verification page to navigate to. It also now counts toward your profile's
+  completion percentage; you can't reach 100% without it.
+- Live-photo capture shows on-screen pose instructions ("Look straight ahead," "Turn slightly
+  left," "Turn slightly right") instead of generic "Photo 1/2/3" labels.
+- **Profile** is now a read-only view with a clear **Edit Profile** button, rather than opening
+  straight into a form.
+- Removed "About" from the top navbar (still reachable from the footer) and removed the separate
+  "Admin" navbar link for admin users (all admin tools are already one click away from their
+  Dashboard).
+- Removed the "skills" field from startup listings and the `Startup` model entirely (Jobs still
+  have a required-skills field, since that's a normal recruiting field).
+- The generated **Investment & Funding Agreement** document now renders on its own plain
+  black-on-white page — no site navbar, footer, or translucent styling — so it stays fully
+  legible and looks like an actual document rather than a themed app screen. The contract
+  language was also rewritten to be more precise and professional.
+- The navbar now shows a clear active/hover state so you always know which page you're on.
+
+**Critical bug fix (this revision) — profile save silently losing data:**
+- Root cause found: the profile page had **two separate `<form>` elements** (profile fields, and
+  identity verification) with two separate submit buttons. If someone filled in both sections but
+  clicked the verification button, the browser only sent that form's fields — the profile fields
+  (phone, experience, etc.) were silently never submitted, and any typed text was lost. This is
+  exactly what caused the "saves fine with a photo, errors with just text" and "0% completion"
+  reports.
+- **Fixed** by merging both sections into one `<form>` with one **Save Profile** button. Profile
+  fields always save; identity verification is processed in the same request only if you provided
+  it (an NID/ID upload *and* all 3 live photos). If you only provide some of the verification data,
+  your profile fields still save and you get a clear message about what's missing for verification
+  specifically — nothing is silently dropped anymore.
+- Added a **separate "Upload NID / ID Card" section** distinct from the live-photo capture, since
+  verification now requires both an uploaded ID document and 3 live photos together.
+- **Investors can no longer send investment interest before their identity is verified** — this
+  was previously only enforced for founders creating startups/jobs, not investors.
+- The **startup detail page now shows the founder's name (and email, once logged in)** — this was
+  completely missing before, so investors had no way to identify who they were dealing with.
+- Fixed a leftover bug from an earlier refactor: the investor dashboard's "Accepted" stat was
+  silently stuck at 0 because it checked for an old status value (`"accepted"`) that no longer
+  exists in the current negotiation flow (`"active"` is the correct value now).
+
+**New: full milestone fund-flow tracking (previously missing entirely):**
+Previously, "releasing a milestone" was a single admin button click with no record of the investor
+actually sending money, and founders had no visibility into payments beyond that one click. Each
+milestone now goes through four explicit, auditable stages:
+1. **Investor marks funds as sent** — with a required reference/transaction note (`Mark as Sent`
+   button on the agreement page, investor-only).
+2. **Admin confirms receipt** — VentureBridge now explicitly "holds" the funds in custody before
+   releasing them (`Confirm Funds Received`, admin-only).
+3. **Admin releases to the founder** — same as before, but now only possible after step 2, and
+   the platform fee is calculated at this point.
+4. **Founder uploads proof of use** — after release, the founder can attach a document (e.g. an
+   equipment purchase receipt) with a description, visible to both the investor and admin on the
+   agreement page.
+- **Transaction History** (`/investment/transactions`) — a new page for founders and investors
+  showing every milestone across every agreement they're party to, with its current stage and
+  last-updated date, so it's clear at a glance whether an investor has paid and whether a founder
+  has actually received funds.
+- **Payment summary stat cards** on both dashboards: founders see Total Expected / Received So Far
+  / Pending Release / Not Yet Sent; investors see Total Committed / Sent So Far / Still Owed.
+- All of these actions are logged to the audit trail (`milestone_marked_sent`,
+  `milestone_receipt_confirmed`, `milestone_released`, `milestone_proof_uploaded`).
 
 ## Notes on scope
 

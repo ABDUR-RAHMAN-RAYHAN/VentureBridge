@@ -25,7 +25,6 @@ def create_app():
     from blueprints.startups import bp as startups_bp
     from blueprints.jobs import bp as jobs_bp
     from blueprints.investment import bp as investment_bp
-    from blueprints.verification import bp as verification_bp
     from blueprints.messaging import bp as messaging_bp
     from blueprints.admin import bp as admin_bp
 
@@ -34,7 +33,6 @@ def create_app():
     app.register_blueprint(startups_bp)
     app.register_blueprint(jobs_bp)
     app.register_blueprint(investment_bp)
-    app.register_blueprint(verification_bp)
     app.register_blueprint(messaging_bp)
     app.register_blueprint(admin_bp)
 

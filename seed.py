@@ -56,7 +56,6 @@ def run():
             industry="CleanTech", stage="Early Stage", location="Dhaka, Bangladesh",
             website="https://greentech.example.com", founded_year=2023,
             business_model="B2B hardware + subscription monitoring", team_size=8,
-            required_skills="Embedded Systems, Solar Engineering, Sales",
         )
         mediconnect = Startup(
             founder_id=farhan.id, name="MediConnect",
@@ -64,21 +63,18 @@ def run():
             industry="HealthTech", stage="MVP", location="Chattogram, Bangladesh",
             website="https://mediconnect.example.com", founded_year=2024,
             business_model="Per-consultation commission", team_size=4,
-            required_skills="React Native, Node.js, Healthcare Compliance",
         )
         agrilink = Startup(
             founder_id=aisha.id, name="AgriLink Marketplace",
             description="A B2B marketplace connecting farmers directly with wholesale buyers.",
             industry="AgriTech", stage="Idea", location="Rajshahi, Bangladesh",
             founded_year=2025, business_model="Transaction fee marketplace", team_size=2,
-            required_skills="Logistics, Marketplace Growth",
         )
         solargrid = Startup(
             founder_id=farhan.id, name="SolarGrid Energy",
             description="Grid-scale solar battery storage systems for rural micro-grids.",
             industry="CleanTech", stage="Growth", location="Rajshahi, Bangladesh",
             founded_year=2021, business_model="B2B hardware + long-term service contracts", team_size=12,
-            required_skills="Solar Engineering, Grid Management, Embedded Systems",
         )
         db.session.add_all([greentech, mediconnect, agrilink, solargrid])
         db.session.flush()
@@ -163,14 +159,25 @@ def run():
         db.session.add_all([
             FundingMilestone(agreement_id=agreement1.id, title="Prototype hardware batch (50 units)",
                               description="Funds cover component sourcing and assembly.",
-                              amount=20000, status="released",
-                              released_at=datetime.utcnow(), released_by=admin.id, order_index=0),
+                              amount=20000, status="released", order_index=0,
+                              investor_sent_at=datetime.utcnow() - timedelta(days=5),
+                              investor_sent_note="Bank transfer #TXN-88213",
+                              admin_confirmed_at=datetime.utcnow() - timedelta(days=4), admin_confirmed_by=admin.id,
+                              released_at=datetime.utcnow() - timedelta(days=3), released_by=admin.id,
+                              proof_document_filename="proof/demo_hardware_receipt.pdf",
+                              proof_description="Invoice from supplier for 50 controller units.",
+                              proof_uploaded_at=datetime.utcnow() - timedelta(days=1)),
             FundingMilestone(agreement_id=agreement1.id, title="Field pilot in 3 districts",
                               description="Deployment, farmer training, and monitoring.",
-                              amount=20000, status="pending", order_index=1),
+                              amount=20000, status="admin_holding", order_index=1,
+                              investor_sent_at=datetime.utcnow() - timedelta(days=2),
+                              investor_sent_note="Bank transfer #TXN-88340",
+                              admin_confirmed_at=datetime.utcnow() - timedelta(hours=20), admin_confirmed_by=admin.id),
             FundingMilestone(agreement_id=agreement1.id, title="Sales & marketing scale-up",
                               description="Hiring field sales associates and marketing materials.",
-                              amount=10000, status="pending", order_index=2),
+                              amount=10000, status="investor_sent", order_index=2,
+                              investor_sent_at=datetime.utcnow() - timedelta(hours=3),
+                              investor_sent_note="Bank transfer #TXN-88502"),
         ])
 
         # Connection + sample messages for the fully-signed pair
@@ -225,6 +232,7 @@ def run():
 
         # ---- Identity verification samples ----
         v1 = IdentityVerification(user_id=aisha.id, doc_type="National ID", status="approved",
+                                   id_document_filename="verification/demo_nid_aisha.pdf",
                                    reviewed_by=admin.id, reviewed_at=datetime.utcnow())
         db.session.add(v1)
         db.session.flush()
@@ -233,7 +241,8 @@ def run():
             VerificationPhoto(verification_id=v1.id, filename="verification/demo_aisha_2.jpg", slot=2),
             VerificationPhoto(verification_id=v1.id, filename="verification/demo_aisha_3.jpg", slot=3),
         ])
-        v2 = IdentityVerification(user_id=david.id, doc_type="Passport", status="pending")
+        v2 = IdentityVerification(user_id=david.id, doc_type="Passport", status="pending",
+                                   id_document_filename="verification/demo_nid_david.pdf")
         db.session.add(v2)
         db.session.flush()
         db.session.add_all([
@@ -242,6 +251,7 @@ def run():
             VerificationPhoto(verification_id=v2.id, filename="verification/demo_david_3.jpg", slot=3),
         ])
         v3 = IdentityVerification(user_id=farhan.id, doc_type="National ID", status="approved",
+                                   id_document_filename="verification/demo_nid_farhan.pdf",
                                    reviewed_by=admin.id, reviewed_at=datetime.utcnow())
         db.session.add(v3)
         db.session.flush()
@@ -249,6 +259,16 @@ def run():
             VerificationPhoto(verification_id=v3.id, filename="verification/demo_farhan_1.jpg", slot=1),
             VerificationPhoto(verification_id=v3.id, filename="verification/demo_farhan_2.jpg", slot=2),
             VerificationPhoto(verification_id=v3.id, filename="verification/demo_farhan_3.jpg", slot=3),
+        ])
+        v4 = IdentityVerification(user_id=meera.id, doc_type="National ID", status="approved",
+                                   id_document_filename="verification/demo_nid_meera.pdf",
+                                   reviewed_by=admin.id, reviewed_at=datetime.utcnow())
+        db.session.add(v4)
+        db.session.flush()
+        db.session.add_all([
+            VerificationPhoto(verification_id=v4.id, filename="verification/demo_meera_1.jpg", slot=1),
+            VerificationPhoto(verification_id=v4.id, filename="verification/demo_meera_2.jpg", slot=2),
+            VerificationPhoto(verification_id=v4.id, filename="verification/demo_meera_3.jpg", slot=3),
         ])
 
         db.session.commit()

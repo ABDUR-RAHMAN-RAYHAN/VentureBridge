@@ -153,31 +153,27 @@ def run():
                                 benefit_terms="8% equity stake in GreenTech Solutions in exchange for "
                                               "$50,000 in milestone-based funding.",
                                 founder_signed_name=aisha.full_name, founder_signed_at=datetime.utcnow() - timedelta(days=2),
-                                investor_signed_name=david.full_name, investor_signed_at=datetime.utcnow() - timedelta(days=1))
+                                investor_signed_name=david.full_name, investor_signed_at=datetime.utcnow() - timedelta(days=1),
+                                investor_deposited_at=datetime.utcnow() - timedelta(days=1),
+                                investor_deposit_note="Bank transfer #TXN-88213 (full amount)",
+                                admin_confirmed_deposit_at=datetime.utcnow() - timedelta(hours=20),
+                                admin_confirmed_deposit_by=admin.id)
         db.session.add(agreement1)
         db.session.flush()
         db.session.add_all([
             FundingMilestone(agreement_id=agreement1.id, title="Prototype hardware batch (50 units)",
                               description="Funds cover component sourcing and assembly.",
                               amount=20000, status="released", order_index=0,
-                              investor_sent_at=datetime.utcnow() - timedelta(days=5),
-                              investor_sent_note="Bank transfer #TXN-88213",
-                              admin_confirmed_at=datetime.utcnow() - timedelta(days=4), admin_confirmed_by=admin.id,
-                              released_at=datetime.utcnow() - timedelta(days=3), released_by=admin.id,
+                              released_at=datetime.utcnow() - timedelta(hours=18), released_by=admin.id,
                               proof_document_filename="proof/demo_hardware_receipt.pdf",
                               proof_description="Invoice from supplier for 50 controller units.",
-                              proof_uploaded_at=datetime.utcnow() - timedelta(days=1)),
+                              proof_uploaded_at=datetime.utcnow() - timedelta(hours=6)),
             FundingMilestone(agreement_id=agreement1.id, title="Field pilot in 3 districts",
                               description="Deployment, farmer training, and monitoring.",
-                              amount=20000, status="admin_holding", order_index=1,
-                              investor_sent_at=datetime.utcnow() - timedelta(days=2),
-                              investor_sent_note="Bank transfer #TXN-88340",
-                              admin_confirmed_at=datetime.utcnow() - timedelta(hours=20), admin_confirmed_by=admin.id),
+                              amount=20000, status="pending", order_index=1),
             FundingMilestone(agreement_id=agreement1.id, title="Sales & marketing scale-up",
                               description="Hiring field sales associates and marketing materials.",
-                              amount=10000, status="investor_sent", order_index=2,
-                              investor_sent_at=datetime.utcnow() - timedelta(hours=3),
-                              investor_sent_note="Bank transfer #TXN-88502"),
+                              amount=10000, status="pending", order_index=2),
         ])
 
         # Connection + sample messages for the fully-signed pair
